@@ -1,0 +1,719 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Live Monitoring - CrowdVision</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css" rel="stylesheet">
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%); min-height: 100vh; }
+        .navbar { background: white; padding: 1rem 0; box-shadow: 0 2px 10px rgba(0,0,0,0.1); position: sticky; top: 0; z-index: 1000; }
+        .nav-container { max-width: 1600px; margin: 0 auto; display: flex; justify-content: space-between; align-items: center; padding: 0 2rem; }
+        .logo { font-size: 1.5rem; font-weight: bold; color: #667eea; cursor: pointer; }
+        .btn { padding: 0.5rem 1.2rem; border: none; border-radius: 20px; cursor: pointer; font-weight: 500; text-decoration: none; display: inline-flex; align-items: center; gap: 0.4rem; transition: all 0.3s; font-size: 0.9rem; }
+        .btn-outline { border: 2px solid #667eea; color: #667eea; background: transparent; }
+        .btn-outline:hover { background: #667eea; color: white; transform: translateY(-2px); }
+        .container { max-width: 1600px; margin: 0 auto; padding: 1.5rem 2rem; }
+        .header { text-align: center; margin-bottom: 1.5rem; }
+        .header h1 { font-size: 2.2rem; background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; }
+        .header p { color: #666; font-size: 1rem; }
+        
+        /* ── Main layout ── */
+        .main-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; }
+        
+        /* ── Camera Management ── */
+        .cameras-section { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 1.5rem; margin-bottom: 1.5rem; }
+        .section-title { font-size: 1.1rem; font-weight: 600; color: #333; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.5rem; justify-content: space-between; }
+        .cameras-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+        .camera-card { background: #f8f9fc; border: 2px solid #e1e5f2; border-radius: 12px; overflow: hidden; transition: all 0.3s; }
+        .camera-card.active { border-color: #667eea; }
+        .camera-card-header { padding: 0.75rem 1rem; background: linear-gradient(45deg, #667eea, #764ba2); color: white; display: flex; align-items: center; justify-content: space-between; }
+        .camera-card-header .cam-name { font-weight: 600; font-size: 0.95rem; }
+        .camera-video-wrap { position: relative; background: #1a1a2e; }
+        .camera-video-wrap video, .camera-video-wrap canvas { width: 100%; max-height: 180px; object-fit: cover; display: block; }
+        .camera-video-wrap canvas { position: absolute; top: 0; left: 0; pointer-events: none; }
+        .cam-overlay { position: absolute; top: 6px; left: 6px; background: rgba(0,0,0,0.65); color: white; padding: 3px 8px; border-radius: 8px; font-size: 0.75rem; display: flex; align-items: center; gap: 4px; }
+        .cam-count-badge { position: absolute; top: 6px; right: 6px; background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 4px 10px; border-radius: 20px; font-weight: bold; font-size: 0.8rem; }
+        .cam-count-badge.medium { background: linear-gradient(45deg, #ffc107, #fd7e14); }
+        .cam-count-badge.high { background: linear-gradient(45deg, #fd7e14, #dc3545); }
+        .cam-count-badge.critical { background: linear-gradient(45deg, #dc3545, #6f42c1); animation: pulse 1s infinite; }
+        .camera-card-footer { padding: 0.6rem 1rem; display: flex; align-items: center; gap: 0.5rem; background: white; }
+        .zone-select { flex: 1; border: 1.5px solid #dde; border-radius: 8px; padding: 4px 8px; font-size: 0.85rem; }
+        .btn-sm { padding: 4px 10px; border-radius: 8px; font-size: 0.8rem; border: none; cursor: pointer; font-weight: 500; }
+        .btn-danger { background: #dc3545; color: white; }
+        .btn-danger:hover { background: #c82333; }
+        .btn-success { background: #28a745; color: white; }
+        .btn-success:hover { background: #218838; }
+        .add-camera-card { background: #f0f3ff; border: 2px dashed #b3c0f7; border-radius: 12px; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 200px; cursor: pointer; transition: all 0.3s; gap: 0.5rem; color: #667eea; }
+        .add-camera-card:hover { background: #e6ebff; border-color: #667eea; transform: translateY(-2px); }
+        .add-camera-card i { font-size: 2rem; }
+        .add-camera-card span { font-weight: 600; font-size: 0.95rem; }
+
+        .btn-refresh { background: linear-gradient(45deg, #007bff, #6610f2); color: white; }
+        /* ── Right Sidebar ── */
+        .sidebar { display: flex; flex-direction: column; gap: 1.5rem; }
+        .panel { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 1.5rem; }
+        
+        /* ── Zone Grid ── */
+        .zones { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; }
+        .zone { padding: 0.8rem 0.5rem; border-radius: 10px; text-align: center; font-weight: bold; color: white; transition: all 0.3s; cursor: default; }
+        .zone:hover { transform: scale(1.04); }
+        .zone.low    { background: linear-gradient(135deg, #28a745, #20c997); }
+        .zone.medium { background: linear-gradient(135deg, #ffc107, #fd7e14); }
+        .zone.high   { background: linear-gradient(135deg, #fd7e14, #dc3545); }
+        .zone.critical { background: linear-gradient(135deg, #dc3545, #6f42c1); animation: pulse 1s infinite; }
+        @keyframes pulse { 0%,100%{opacity:1;transform:scale(1)} 50%{opacity:.8;transform:scale(1.02)} }
+        .zone-id { font-size: 0.85rem; opacity: 0.9; }
+        .zone-cam { font-size: 0.7rem; opacity: 0.8; margin-top: 1px; }
+        .zone-count { font-size: 1.3rem; margin-top: 3px; }
+        .zone-level { font-size: 0.75rem; opacity: 0.9; }
+        
+        /* ── Total Count ── */
+        .total-count { font-size: 3.5rem; font-weight: bold; background: linear-gradient(45deg, #667eea, #764ba2); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text; text-align: center; margin: 0.5rem 0; }
+        .count-label { text-align: center; color: #666; font-size: 0.95rem; }
+        
+        /* ── Alerts ── */
+        .alerts { max-height: 200px; overflow-y: auto; border: 1px solid #e1e5e9; padding: 0.75rem; background: #f8f9fa; border-radius: 10px; margin-top: 0.5rem; }
+        .alert-item { padding: 0.5rem 0.75rem; margin: 0.4rem 0; background: white; border-left: 4px solid #dc3545; border-radius: 6px; font-size: 0.82rem; box-shadow: 0 1px 4px rgba(0,0,0,0.07); }
+        
+        /* ── Status bar ── */
+        .status { text-align: center; padding: 0.7rem 1rem; margin-bottom: 1rem; border-radius: 12px; font-weight: bold; display: flex; align-items: center; justify-content: center; gap: 0.5rem; font-size: 0.9rem; }
+        .status.connected    { background: linear-gradient(45deg, #d4edda, #c3e6cb); color: #155724; }
+        .status.disconnected { background: linear-gradient(45deg, #f8d7da, #f5c6cb); color: #721c24; }
+        
+        /* ── Camera selector dialog ── */
+        .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.55); z-index: 9000; align-items: center; justify-content: center; }
+        .modal-overlay.open { display: flex; }
+        .modal { background: white; border-radius: 16px; padding: 2rem; max-width: 480px; width: 90%; box-shadow: 0 20px 60px rgba(0,0,0,0.3); }
+        .modal h3 { margin-bottom: 1rem; color: #333; }
+        .modal-source-list { display: flex; flex-direction: column; gap: 0.75rem; margin-bottom: 1rem; }
+        .source-option { display: flex; align-items: center; gap: 1rem; padding: 0.9rem 1rem; border: 2px solid #e1e5e9; border-radius: 10px; cursor: pointer; transition: all 0.2s; }
+        .source-option:hover { border-color: #667eea; background: #f0f3ff; }
+        .source-option.selected { border-color: #667eea; background: #e6ebff; }
+        .source-option i { font-size: 1.5rem; color: #667eea; width: 2rem; text-align: center; }
+        .source-option .info { flex: 1; }
+        .source-option .info strong { display: block; font-size: 0.95rem; }
+        .source-option .info span { font-size: 0.82rem; color: #666; }
+        .modal-footer { display: flex; gap: 0.5rem; justify-content: flex-end; }
+        .btn-primary { background: linear-gradient(45deg, #667eea, #764ba2); color: white; padding: 0.6rem 1.5rem; border: none; border-radius: 10px; cursor: pointer; font-weight: 600; font-size: 0.95rem; }
+        .btn-secondary { background: #f0f0f0; color: #555; padding: 0.6rem 1.2rem; border: none; border-radius: 10px; cursor: pointer; font-weight: 500; font-size: 0.95rem; }
+        
+        /* ── Lost & Find ── */
+        .lost-find-section { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 1.5rem; margin-top: 1.5rem; }
+        .lost-find-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 1.5rem; align-items: start; }
+        .upload-zone { border: 2px dashed #b3c0f7; border-radius: 12px; padding: 1.5rem; text-align: center; cursor: pointer; transition: all 0.2s; position: relative; min-height: 180px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 0.5rem; }
+        .upload-zone:hover { border-color: #667eea; background: #f0f3ff; }
+        .upload-zone i { font-size: 2.5rem; color: #667eea; }
+        .upload-zone span { font-size: 0.9rem; color: #667eea; font-weight: 500; }
+        .upload-zone input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+        .upload-zone img { max-width: 100%; max-height: 160px; border-radius: 8px; object-fit: cover; }
+        .find-btn { margin-top: 0.75rem; width: 100%; padding: 0.8rem; background: linear-gradient(45deg, #667eea, #764ba2); color: white; border: none; border-radius: 10px; font-weight: 600; font-size: 0.95rem; cursor: pointer; transition: all 0.2s; }
+        .find-btn:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102,126,234,0.4); }
+        .find-btn:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }
+        .results-panel { min-height: 200px; }
+        .result-card { border: 2px solid #e1e5e9; border-radius: 10px; overflow: hidden; margin-bottom: 0.75rem; transition: all 0.2s; }
+        .result-card:hover { border-color: #667eea; box-shadow: 0 4px 12px rgba(102,126,234,0.2); }
+        .result-card-header { padding: 0.5rem 0.75rem; background: linear-gradient(45deg, #667eea, #764ba2); color: white; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; }
+        .result-card-body { display: flex; gap: 0.75rem; padding: 0.75rem; align-items: flex-start; }
+        .result-thumb { width: 70px; height: 90px; border-radius: 6px; object-fit: cover; border: 2px solid #e1e5e9; flex-shrink: 0; }
+        .result-info { flex: 1; }
+        .result-info .zone-badge { display: inline-block; background: linear-gradient(45deg, #28a745, #20c997); color: white; padding: 2px 8px; border-radius: 10px; font-size: 0.78rem; font-weight: 600; margin-bottom: 4px; }
+        .result-info .ts { font-size: 0.8rem; color: #666; display: flex; align-items: center; gap: 4px; margin: 2px 0; }
+        .result-info .cam { font-size: 0.78rem; color: #888; }
+        .confidence-bar { height: 5px; background: #e1e5e9; border-radius: 3px; margin-top: 6px; overflow: hidden; }
+        .confidence-fill { height: 100%; border-radius: 3px; transition: width 0.5s; }
+        .no-results { text-align: center; padding: 2rem; color: #999; }
+        .no-results i { font-size: 2.5rem; margin-bottom: 0.75rem; display: block; }
+        .best-match-msg { background: linear-gradient(135deg, #e8f5e9, #c8e6c9); border-left: 4px solid #28a745; padding: 0.75rem 1rem; border-radius: 0 8px 8px 0; margin-bottom: 1rem; font-size: 0.9rem; color: #1b5e20; }
+        
+        /* ── Snapshots Gallery ── */
+        .snapshots-section { background: white; border-radius: 16px; box-shadow: 0 4px 20px rgba(0,0,0,0.08); padding: 1.5rem; margin-top: 1.5rem; }
+        .snapshots-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+        .snap-item { border-radius: 8px; overflow: hidden; cursor: pointer; border: 2px solid transparent; transition: all 0.2s; position: relative; }
+        .snap-item:hover { border-color: #667eea; transform: scale(1.03); }
+        .snap-item img { width: 100%; height: 90px; object-fit: cover; display: block; }
+        .snap-info { position: absolute; bottom: 0; left: 0; right: 0; background: rgba(0,0,0,0.7); color: white; font-size: 0.65rem; padding: 3px 5px; text-align: center; }
+        .snap-info .zone-tag { color: #6df; font-weight: bold; }
+        
+        /* ── Loading spinner ── */
+        .loading { display: inline-block; width: 18px; height: 18px; border: 3px solid rgba(255,255,255,0.3); border-radius: 50%; border-top-color: white; animation: spin 1s ease-in-out infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        @media (max-width: 1100px) { .main-layout { grid-template-columns: 1fr; } }
+        @media (max-width: 768px) { .lost-find-layout { grid-template-columns: 1fr; } .cameras-grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<nav class="navbar">
+    <div class="nav-container">
+        <div class="logo" onclick="window.location.reload()"><i class="fas fa-video"></i> CrowdVision</div>
+        <div style="display:flex;align-items:center;gap:0.5rem;flex-wrap:wrap;">
+            <a href="{{ url_for('index') }}" class="btn btn-outline"><i class="fas fa-satellite-dish"></i> Live Monitoring</a>
+            <a href="{{ url_for('video_upload') }}" class="btn btn-outline"><i class="fas fa-upload"></i> Video Upload</a>
+            <span style="color:#333;font-weight:500;">Welcome, {{ session.username }}!</span>
+            <a href="{{ url_for('logout') }}" class="btn btn-outline"><i class="fas fa-sign-out-alt"></i> Logout</a>
+        </div>
+    </div>
+</nav>
+
+<div class="container">
+    <div class="header">
+        <h1><i class="fas fa-chart-line"></i> Live Monitoring Dashboard</h1>
+        <p>Multi-camera crowd density analysis with AI-powered zone detection</p>
+    </div>
+
+    <!-- ── Browser Camera Management ── -->
+    <div class="cameras-section">
+        <div class="section-title">
+            <span><i class="fas fa-cameras" style="color:#667eea"></i> Browser Cameras (Phone / Laptop)</span>
+            <button class="btn btn-primary" id="addCameraBtn" onclick="showAddCameraModal()" style="background:linear-gradient(45deg,#667eea,#764ba2);color:white;border:none;padding:0.4rem 1rem;border-radius:8px;cursor:pointer;font-weight:600;font-size:0.85rem;">
+                <i class="fas fa-plus"></i> Add Camera
+            </button>
+        </div>
+        <div class="cameras-grid" id="camerasGrid">
+            <!-- Cameras injected here -->
+            <div class="add-camera-card" id="addCameraPlaceholder" onclick="showAddCameraModal()">
+                <i class="fas fa-plus-circle"></i>
+                <span>Add Camera</span>
+                <small style="color:#999;font-size:0.8rem;">Phone, laptop, USB webcam</small>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Zone Grid + Analytics side by side ── -->
+    <div class="main-layout">
+        <!-- Zone Grid -->
+        <div class="panel">
+            <div class="section-title"><span><i class="fas fa-th" style="color:#667eea"></i> Zone Status Grid</span></div>
+            <div class="zones" id="zoneGrid"></div>
+        </div>
+
+        <!-- Analytics -->
+        <div class="panel">
+            <div class="section-title"><span><i class="fas fa-chart-bar" style="color:#667eea"></i> Analytics</span></div>
+            <div class="total-count" id="totalCount">0</div>
+            <p class="count-label"><i class="fas fa-users"></i> Total People (All Cameras)</p>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:0.5rem;margin-top:1rem;">
+                <div style="background:#f0f3ff;border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:1.4rem;font-weight:bold;color:#667eea" id="activeCamCount">0</div>
+                    <div style="font-size:0.75rem;color:#888">Active Cameras</div>
+                </div>
+                <div style="background:#f0fff4;border-radius:8px;padding:0.75rem;text-align:center;">
+                    <div style="font-size:1.4rem;font-weight:bold;color:#28a745" id="snapshotCount">0</div>
+                    <div style="font-size:0.75rem;color:#888">Snapshots</div>
+                </div>
+            </div>
+            <h4 style="margin-top:1rem;margin-bottom:0.5rem;font-size:0.95rem;"><i class="fas fa-bell"></i> Recent Alerts</h4>
+            <div class="alerts" id="alertsList">
+                <div style="text-align:center;color:#999;padding:1rem"><i class="fas fa-bell-slash"></i><p>No alerts yet</p></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Lost & Find ── -->
+    <div class="lost-find-section">
+        <div class="section-title"><span><i class="fas fa-search" style="color:#667eea"></i> Lost & Find — Person Locator</span></div>
+        <p style="color:#666;font-size:0.88rem;margin-bottom:1rem;">
+            Upload a photo of a missing person. The system will search all auto-captured snapshots and tell you which zone they were last seen in.
+        </p>
+        <div class="lost-find-layout">
+            <div>
+                <div class="upload-zone" id="uploadZone">
+                    <input type="file" id="findPhotoInput" accept="image/*" onchange="onFindPhotoSelected(event)">
+                    <div id="uploadPlaceholder">
+                        <i class="fas fa-user-search"></i>
+                        <span>Click or drag photo here</span>
+                        <small style="color:#999">JPG, PNG accepted</small>
+                    </div>
+                    <img id="findPhotoPreview" style="display:none">
+                </div>
+                <button class="find-btn" id="findBtn" onclick="findPerson()" disabled>
+                    <i class="fas fa-search"></i> Search All Zones
+                </button>
+            </div>
+            <div class="results-panel" id="findResults">
+                <div class="no-results">
+                    <i class="fas fa-binoculars"></i>
+                    <p>Upload a photo to search</p>
+                    <small style="color:#bbb">Snapshots are auto-captured when people are detected</small>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ── Auto-Snapshots Gallery ── -->
+    <div class="snapshots-section">
+        <div class="section-title">
+            <span><i class="fas fa-images" style="color:#667eea"></i> Auto-Captured Snapshots</span>
+            <button onclick="loadSnapshots()" style="background:linear-gradient(45deg,#667eea,#764ba2);color:white;border:none;padding:0.3rem 0.8rem;border-radius:6px;cursor:pointer;font-size:0.8rem;font-weight:600;">
+                <i class="fas fa-sync-alt"></i> Refresh
+            </button>
+        </div>
+        <p style="color:#666;font-size:0.85rem;margin-bottom:0.5rem;">
+            Snapshots auto-captured when person count changes in any zone. Each person gets a unique ID.
+        </p>
+        <div class="snapshots-gallery" id="snapshotsGallery">
+            <div style="grid-column:1/-1;text-align:center;color:#bbb;padding:1.5rem">
+                <i class="fas fa-camera" style="font-size:2rem;display:block;margin-bottom:0.5rem"></i>
+                Snapshots will appear here as people are detected
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- ── Add Camera Modal ── -->
+<div class="modal-overlay" id="addCameraModal">
+    <div class="modal">
+        <h3><i class="fas fa-camera-plus" style="color:#667eea"></i> Add Camera</h3>
+        <p style="color:#666;font-size:0.88rem;margin-bottom:1rem;">Select camera source and assign it to a monitoring zone.</p>
+        <div class="modal-source-list" id="deviceList">
+            <div style="text-align:center;color:#999;padding:1rem"><i class="fas fa-spinner fa-spin"></i> Detecting cameras...</div>
+        </div>
+        <div style="margin-bottom:1rem">
+            <label style="font-size:0.9rem;font-weight:500;display:block;margin-bottom:0.4rem">Assign to Zone:</label>
+            <select id="zoneAssignSelect" style="width:100%;border:1.5px solid #dde;border-radius:8px;padding:8px 10px;font-size:0.9rem;">
+            </select>
+        </div>
+        <div class="modal-footer">
+            <button class="btn-secondary" onclick="closeAddCameraModal()">Cancel</button>
+            <button class="btn-primary" id="addCameraConfirmBtn" onclick="confirmAddCamera()"><i class="fas fa-plus"></i> Add Camera</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════
+//  State
+// ══════════════════════════════════════════════════════
+let updateInterval = null;
+let cameras = [];       // [{id, deviceId, label, zoneId, stream, videoEl, canvasEl, active, analyzing}]
+let nextCamId = 1;
+const FRAME_INTERVAL = 1500; // ms between frame analyses per camera
+const ZONES = ['Z1','Z2','Z3','Z4','Z5','Z6','Z7','Z8','Z9'];
+let selectedDeviceId = null;
+let selectedDeviceLabel = '';
+let availableDevices = [];
+
+// ══════════════════════════════════════════════════════
+//  Zone Grid + Stats
+// ══════════════════════════════════════════════════════
+function updateZoneData() {
+    return fetch('/api/zones')
+        .then(r => r.json())
+        .then(data => {
+            document.getElementById('totalCount').textContent = data.total || 0;
+            const grid = document.getElementById('zoneGrid');
+            grid.innerHTML = '';
+            if (data.zones && data.zones.length > 0) {
+                data.zones.forEach(zone => {
+                    const cam = cameras.find(c => c.zoneId === zone.id && c.active);
+                    const camLabel = cam ? `<div class="zone-cam"><i class="fas fa-camera"></i> ${cam.label}</div>` : '';
+                    const div = document.createElement('div');
+                    div.className = `zone ${String(zone.level).toLowerCase()}`;
+                    div.innerHTML = `
+                        <div class="zone-id">${zone.id}</div>
+                        ${camLabel}
+                        <div class="zone-count">${zone.count}</div>
+                        <div class="zone-level">${zone.level}</div>
+                    `;
+                    grid.appendChild(div);
+                });
+            } else {
+                grid.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#999;padding:1rem">No zone data yet</div>`;
+            }
+            // Update active cameras stat
+            document.getElementById('activeCamCount').textContent = cameras.filter(c => c.active).length;
+        })
+        .catch(err => console.error('Zone fetch error:', err));
+}
+
+function updateAlerts() {
+    return fetch('/api/alerts?limit=5')
+        .then(r => r.json())
+        .then(data => {
+            const el = document.getElementById('alertsList');
+            const alerts = Array.isArray(data.alerts) ? data.alerts : [];
+            if (alerts.length > 0) {
+                el.innerHTML = alerts.map(a => `
+                    <div class="alert-item">
+                        <i class="fas fa-exclamation-triangle" style="color:#dc3545;margin-right:0.4rem"></i>
+                        [${a.timestamp}] ${a.message}
+                    </div>
+                `).join('');
+            } else {
+                el.innerHTML = `<div style="text-align:center;color:#999;padding:1rem"><i class="fas fa-bell-slash"></i><p>No alerts yet</p></div>`;
+            }
+        })
+        .catch(err => console.error('Alerts fetch error:', err));
+}
+
+// ══════════════════════════════════════════════════════
+//  Refresh
+// ══════════════════════════════════════════════════════
+function refreshData() {
+    Promise.all([updateZoneData(), updateAlerts(), loadSnapshots()]);
+}
+
+function startUpdates() {
+    if (updateInterval) clearInterval(updateInterval);
+    updateInterval = setInterval(() => { updateZoneData(); updateAlerts(); }, 1500);
+}
+
+// ══════════════════════════════════════════════════════
+//  Browser Camera Management
+// ══════════════════════════════════════════════════════
+async function showAddCameraModal() {
+    document.getElementById('addCameraModal').classList.add('open');
+    // Populate zone select
+    const sel = document.getElementById('zoneAssignSelect');
+    sel.innerHTML = ZONES.map(z => `<option value="${z}">${z}</option>`).join('');
+    // Enumerate devices
+    const listEl = document.getElementById('deviceList');
+    listEl.innerHTML = `<div style="text-align:center;color:#999;padding:1rem"><i class="fas fa-spinner fa-spin"></i> Requesting camera access...</div>`;
+    selectedDeviceId = null;
+    try {
+        // Request permission first
+        const tempStream = await navigator.mediaDevices.getUserMedia({video: true});
+        tempStream.getTracks().forEach(t => t.stop());
+        const devices = await navigator.mediaDevices.enumerateDevices();
+        availableDevices = devices.filter(d => d.kind === 'videoinput');
+        listEl.innerHTML = '';
+        if (availableDevices.length === 0) {
+            listEl.innerHTML = `<div style="color:#dc3545;padding:1rem;text-align:center">No cameras found</div>`;
+            return;
+        }
+        availableDevices.forEach((dev, i) => {
+            const label = dev.label || `Camera ${i + 1}`;
+            const div = document.createElement('div');
+            div.className = 'source-option';
+            div.dataset.deviceId = dev.deviceId;
+            div.dataset.label = label;
+            const icon = label.toLowerCase().includes('front') || label.toLowerCase().includes('user') ? 'fa-user' :
+                         label.toLowerCase().includes('back') || label.toLowerCase().includes('rear') ? 'fa-mobile-alt' :
+                         label.toLowerCase().includes('phone') ? 'fa-mobile-alt' :
+                         label.toLowerCase().includes('usb') ? 'fa-plug' : 'fa-camera';
+            div.innerHTML = `
+                <i class="fas ${icon}"></i>
+                <div class="info">
+                    <strong>${label}</strong>
+                    <span>Device ${i + 1}</span>
+                </div>
+                <i class="fas fa-check-circle" style="color:#667eea;display:none" class="check"></i>
+            `;
+            div.onclick = () => selectDevice(div, dev.deviceId, label);
+            listEl.appendChild(div);
+        });
+        // Auto-select first
+        if (availableDevices.length > 0) {
+            selectDevice(listEl.querySelector('.source-option'), availableDevices[0].deviceId, availableDevices[0].label || 'Camera 1');
+        }
+    } catch (e) {
+        listEl.innerHTML = `<div style="color:#dc3545;padding:1rem;text-align:center"><i class="fas fa-times-circle"></i><br>Camera access denied: ${e.message}</div>`;
+    }
+}
+
+function selectDevice(el, deviceId, label) {
+    document.querySelectorAll('.source-option').forEach(o => {
+        o.classList.remove('selected');
+        const chk = o.querySelector('.fa-check-circle');
+        if (chk) chk.style.display = 'none';
+    });
+    el.classList.add('selected');
+    const chk = el.querySelector('.fa-check-circle');
+    if (chk) chk.style.display = 'block';
+    selectedDeviceId = deviceId;
+    selectedDeviceLabel = label;
+}
+
+function closeAddCameraModal() {
+    document.getElementById('addCameraModal').classList.remove('open');
+}
+
+async function confirmAddCamera() {
+    if (!selectedDeviceId && availableDevices.length > 0) {
+        selectedDeviceId = availableDevices[0].deviceId;
+        selectedDeviceLabel = availableDevices[0].label || 'Camera 1';
+    }
+    if (!selectedDeviceId) {
+        alert('Please select a camera device.');
+        return;
+    }
+    const zoneId = document.getElementById('zoneAssignSelect').value;
+    closeAddCameraModal();
+    await addCamera(selectedDeviceId, selectedDeviceLabel, zoneId);
+}
+
+async function addCamera(deviceId, label, zoneId) {
+    const camId = `cam_${nextCamId++}`;
+    const shortLabel = label.length > 18 ? label.slice(0, 18) + '…' : label;
+    
+    // Create camera card DOM
+    const grid = document.getElementById('camerasGrid');
+    const placeholder = document.getElementById('addCameraPlaceholder');
+    
+    const card = document.createElement('div');
+    card.className = 'camera-card';
+    card.id = `card_${camId}`;
+    card.innerHTML = `
+        <div class="camera-card-header">
+            <span class="cam-name"><i class="fas fa-camera"></i> ${shortLabel}</span>
+            <span style="font-size:0.75rem;opacity:0.8">${zoneId}</span>
+        </div>
+        <div class="camera-video-wrap" id="wrap_${camId}">
+            <video id="vid_${camId}" autoplay muted playsinline></video>
+            <canvas id="canvas_${camId}"></canvas>
+            <div class="cam-overlay" id="overlay_${camId}"><i class="fas fa-circle" style="color:#ff4757"></i> Starting...</div>
+            <div class="cam-count-badge low" id="badge_${camId}">0</div>
+        </div>
+        <div class="camera-card-footer">
+            <select class="zone-select" id="zonesel_${camId}" onchange="reassignZone('${camId}', this.value)">
+                ${ZONES.map(z => `<option value="${z}" ${z === zoneId ? 'selected' : ''}>${z}</option>`).join('')}
+            </select>
+            <button class="btn-sm btn-danger" onclick="removeCamera('${camId}')"><i class="fas fa-times"></i></button>
+        </div>
+    `;
+    grid.insertBefore(card, placeholder);
+    
+    // Start video stream
+    let stream;
+    try {
+        stream = await navigator.mediaDevices.getUserMedia({
+            video: { deviceId: { exact: deviceId }, width: { ideal: 640 }, height: { ideal: 480 } }
+        });
+    } catch(e) {
+        // fallback without exact constraint
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: { deviceId: deviceId } });
+        } catch(e2) {
+            try {
+                stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            } catch(e3) {
+                card.remove();
+                alert('Could not access camera: ' + e3.message);
+                return;
+            }
+        }
+    }
+    
+    const video = document.getElementById(`vid_${camId}`);
+    const canvas = document.getElementById(`canvas_${camId}`);
+    video.srcObject = stream;
+    
+    const camObj = { id: camId, deviceId, label: shortLabel, zoneId, stream, videoEl: video, canvasEl: canvas, active: true, analyzing: false, intervalId: null };
+    cameras.push(camObj);
+    card.classList.add('active');
+    
+    video.onloadedmetadata = () => {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        document.getElementById(`overlay_${camId}`).innerHTML = `<i class="fas fa-circle" style="color:#2ed573"></i> Live`;
+        // Start analysis loop
+        camObj.intervalId = setInterval(() => analyzeFrame(camId), FRAME_INTERVAL);
+        startUpdates();
+        console.log(`Camera "${shortLabel}" added → ${zoneId}`);
+    };
+}
+
+function reassignZone(camId, newZoneId) {
+    const cam = cameras.find(c => c.id === camId);
+    if (cam) cam.zoneId = newZoneId;
+}
+
+function removeCamera(camId) {
+    const cam = cameras.find(c => c.id === camId);
+    if (cam) {
+        if (cam.intervalId) clearInterval(cam.intervalId);
+        if (cam.stream) cam.stream.getTracks().forEach(t => t.stop());
+        cam.active = false;
+        cameras = cameras.filter(c => c.id !== camId);
+    }
+    const card = document.getElementById(`card_${camId}`);
+    if (card) card.remove();
+    updateZoneData();
+}
+
+async function analyzeFrame(camId) {
+    const cam = cameras.find(c => c.id === camId);
+    if (!cam || !cam.active || cam.analyzing) return;
+    cam.analyzing = true;
+    try {
+        const { videoEl, canvasEl, zoneId } = cam;
+        if (!videoEl.videoWidth) { cam.analyzing = false; return; }
+        const ctx = canvasEl.getContext('2d');
+        canvasEl.width = videoEl.videoWidth;
+        canvasEl.height = videoEl.videoHeight;
+        ctx.drawImage(videoEl, 0, 0);
+        const frameData = canvasEl.toDataURL('image/jpeg', 0.6);
+        
+        const resp = await fetch('/api/analyze_camera_frame', {
+            method: 'POST',
+            headers: {'Content-Type': 'application/json'},
+            body: JSON.stringify({ camera_id: camId, zone_id: zoneId, frame: frameData })
+        });
+        const result = await resp.json();
+        
+        // Draw bounding boxes on canvas overlay
+        ctx.clearRect(0, 0, canvasEl.width, canvasEl.height);
+        if (result.boxes) {
+            result.boxes.forEach(box => {
+                ctx.strokeStyle = '#ff6b35';
+                ctx.lineWidth = 3;
+                ctx.strokeRect(box.x1, box.y1, box.x2 - box.x1, box.y2 - box.y1);
+                ctx.fillStyle = 'rgba(255,107,53,0.8)';
+                ctx.font = 'bold 13px sans-serif';
+                ctx.fillText(`${(box.conf * 100).toFixed(0)}%`, box.x1 + 3, box.y1 > 18 ? box.y1 - 5 : box.y1 + 15);
+            });
+        }
+        
+        // Update badge
+        const count = result.count || 0;
+        const badge = document.getElementById(`badge_${camId}`);
+        if (badge) {
+            badge.textContent = count;
+            badge.className = 'cam-count-badge ' + (count === 0 ? 'low' : count <= 3 ? 'low' : count <= 6 ? 'medium' : count <= 10 ? 'high' : 'critical');
+        }
+        
+        // If snapshot taken, refresh gallery
+        if (result.changed && result.snapshot_uids && result.snapshot_uids.length > 0) {
+            loadSnapshots();
+            document.getElementById('snapshotCount').textContent = parseInt(document.getElementById('snapshotCount').textContent || '0') + result.snapshot_uids.length;
+        }
+    } catch(e) {
+        console.error('Frame analysis error:', e);
+    }
+    cam.analyzing = false;
+}
+
+// ══════════════════════════════════════════════════════
+//  Lost & Find
+// ══════════════════════════════════════════════════════
+let findPhotoFile = null;
+
+function onFindPhotoSelected(e) {
+    const file = e.target.files[0];
+    if (!file) return;
+    findPhotoFile = file;
+    const reader = new FileReader();
+    reader.onload = ev => {
+        const preview = document.getElementById('findPhotoPreview');
+        const placeholder = document.getElementById('uploadPlaceholder');
+        preview.src = ev.target.result;
+        preview.style.display = 'block';
+        placeholder.style.display = 'none';
+    };
+    reader.readAsDataURL(file);
+    document.getElementById('findBtn').disabled = false;
+}
+
+async function findPerson() {
+    if (!findPhotoFile) return;
+    const btn = document.getElementById('findBtn');
+    const orig = btn.innerHTML;
+    btn.innerHTML = '<div class="loading"></div> Searching...';
+    btn.disabled = true;
+    
+    const formData = new FormData();
+    formData.append('photo', findPhotoFile);
+    
+    try {
+        const resp = await fetch('/api/find_person', { method: 'POST', body: formData });
+        const data = await resp.json();
+        renderFindResults(data);
+    } catch(e) {
+        document.getElementById('findResults').innerHTML = `
+            <div class="no-results"><i class="fas fa-exclamation-triangle" style="color:#dc3545"></i><p>Error: ${e.message}</p></div>`;
+    } finally {
+        btn.innerHTML = orig;
+        btn.disabled = false;
+    }
+}
+
+function renderFindResults(data) {
+    const el = document.getElementById('findResults');
+    if (!data.matches || data.matches.length === 0) {
+        el.innerHTML = `<div class="no-results"><i class="fas fa-binoculars"></i><p>${data.message || 'No matches found'}</p></div>`;
+        return;
+    }
+    let html = '';
+    if (data.message) {
+        html += `<div class="best-match-msg"><i class="fas fa-map-marker-alt"></i> ${data.message}</div>`;
+    }
+    html += `<div style="font-size:0.85rem;color:#666;margin-bottom:0.75rem">Top ${data.matches.length} matches:</div>`;
+    data.matches.slice(0, 5).forEach((m, i) => {
+        const pct = Math.round(m.score * 100);
+        const fillColor = pct > 60 ? '#28a745' : pct > 35 ? '#ffc107' : '#dc3545';
+        html += `
+            <div class="result-card">
+                <div class="result-card-header">
+                    <span>#${i+1} Match — ${pct}% similarity</span>
+                    <span>${m.zone}</span>
+                </div>
+                <div class="result-card-body">
+                    <img class="result-thumb" src="${m.snapshot_url}" onerror="this.style.background='#eee'" alt="snapshot">
+                    <div class="result-info">
+                        <span class="zone-badge"><i class="fas fa-map-marker-alt"></i> ${m.zone}</span>
+                        <div class="ts"><i class="fas fa-clock"></i> ${m.timestamp}</div>
+                        <div class="cam" style="color:#888"><i class="fas fa-camera"></i> ${m.camera_id}</div>
+                        <div class="cam" style="color:#888;margin-top:2px"><i class="fas fa-users"></i> ${m.total_in_frame} people in frame</div>
+                        <div class="confidence-bar"><div class="confidence-fill" style="width:${pct}%;background:${fillColor}"></div></div>
+                    </div>
+                    <a href="${m.full_frame_url}" target="_blank" style="align-self:center;color:#667eea;font-size:0.8rem;white-space:nowrap" title="View full frame">
+                        <i class="fas fa-external-link-alt"></i>
+                    </a>
+                </div>
+            </div>
+        `;
+    });
+    el.innerHTML = html;
+}
+
+// ══════════════════════════════════════════════════════
+//  Snapshots Gallery
+// ══════════════════════════════════════════════════════
+async function loadSnapshots() {
+    try {
+        const resp = await fetch('/api/snapshots?limit=30');
+        const data = await resp.json();
+        const gallery = document.getElementById('snapshotsGallery');
+        document.getElementById('snapshotCount').textContent = data.total || 0;
+        if (!data.snapshots || data.snapshots.length === 0) {
+            gallery.innerHTML = `<div style="grid-column:1/-1;text-align:center;color:#bbb;padding:1.5rem">
+                <i class="fas fa-camera" style="font-size:2rem;display:block;margin-bottom:0.5rem"></i>
+                Snapshots will appear here as people are detected</div>`;
+            return;
+        }
+        gallery.innerHTML = data.snapshots.map(s => `
+            <div class="snap-item" title="Zone: ${s.zone} | ${s.timestamp}" onclick="window.open('${s.full_frame_url}', '_blank')">
+                <img src="${s.snapshot_url || s.full_frame_url}" onerror="this.parentElement.style.display='none'" alt="Person ${s.uid}">
+                <div class="snap-info">
+                    <div class="zone-tag">${s.zone}</div>
+                    <div>${s.timestamp ? s.timestamp.split(' ')[1] : ''}</div>
+                    <div style="color:#adf;font-size:0.6rem">ID:${s.uid}</div>
+                </div>
+            </div>
+        `).join('');
+    } catch(e) {
+        console.error('Snapshots load error:', e);
+    }
+}
+
+// ══════════════════════════════════════════════════════
+//  Init
+// ══════════════════════════════════════════════════════
+async function init() {
+    updateZoneData();
+    updateAlerts();
+    loadSnapshots();
+    startUpdates();
+    setInterval(loadSnapshots, 10000);
+}
+
+window.onload = () => { init(); };
+window.onbeforeunload = () => {
+    if (updateInterval) clearInterval(updateInterval);
+    cameras.forEach(c => { if(c.stream) c.stream.getTracks().forEach(t => t.stop()); });
+};
+</script>
+</body>
+</html>
